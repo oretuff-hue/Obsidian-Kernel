@@ -3,80 +3,38 @@
 
 use core::panic::PanicInfo;
 
-#[repr(C)]
-struct MultibootTag {
-    typ: u32,
-    size: u32,
-}
-
-const TAG_FRAMEBUFFER: u32 = 8;
-
-#[repr(C)]
-struct FramebufferTag {
-    typ: u32,
-    size: u32,
-    addr: u64,
-    pitch: u32,
-    width: u32,
-    height: u32,
-    bpp: u8,
-    fb_type: u8,
-    _reserved: u16,
-}
-
-fn find_framebuffer(mb_addr: usize) -> &'static FramebufferTag {
-    let mut tag = (mb_addr + 8) as *const MultibootTag;
-
-    loop {
-        unsafe {
-            if (*tag).typ == TAG_FRAMEBUFFER {
-                return &*(tag as *const FramebufferTag);
-            }
-            if (*tag).typ == 0 {
-                break;
-            }
-            tag = ((tag as usize + (*tag).size as usize + 7) & !7) as *const MultibootTag;
-        }
-    }
-
-    panic!("no framebuffer");
-}
-
-fn put_pixel(fb: &FramebufferTag, x: u32, y: u32, color: u32) {
-    let ptr = fb.addr as *mut u8;
-    let offset = (y * fb.pitch + x * 4) as isize;
-    unsafe {
-        *(ptr.offset(offset) as *mut u32) = color;
-    }
-}
+mod drivers;
+use drivers::framebuffer::Framebuffer;
+use drivers::keyboard;
+use drivers::serial;
 
 #[no_mangle]
 pub extern "C" fn kernel_main(mb_addr: usize) -> ! {
-    let fb = find_framebuffer(mb_addr);
+    // inicializa framebuffer
+    let fb = Framebuffer::new(mb_addr);
+    fb.clear(0x00000000); // limpa tela preta
 
-    // limpa tela (preto)
-    for y in 0..fb.height {
-        for x in 0..fb.width {
-            put_pixel(fb, x, y, 0x00000000);
-        }
-    }
-
-    // retângulo branco (teste)
+    // desenha um retângulo branco
     for y in 200..400 {
         for x in 300..700 {
-            put_pixel(fb, x, y, 0x00FFFFFF);
+            fb.put_pixel(x, y, 0x00FFFFFF);
         }
     }
 
+    // inicializa serial (debug)
+    serial::init();
+    serial::write_string("Kernel iniciou!\n");
+
     loop {
+        // lê scancode do teclado
+        let _sc = keyboard::read_scancode();
+        // aqui você poderia processar e desenhar algo no framebuffer
         unsafe { core::arch::asm!("hlt"); }
     }
 }
 
 #[panic_handler]
-fn panic(_: &PanicInfo) -> ! {
-    loop {
-        unsafe { core::arch::asm!("hlt"); }
-    }
+fn panic(info: &PanicInfo) -> ! {
+    serial::write_string("Kernel panic!\n");
+    loop { unsafe { core::arch::asm!("hlt"); } }
 }
-  
