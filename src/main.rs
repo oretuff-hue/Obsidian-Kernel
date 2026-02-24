@@ -1,40 +1,42 @@
 #![no_std]
 #![no_main]
+#![feature(abi_x86_interrupt)]
 
+// ==== módulos do kernel (fora de src) ====
+
+#[path = "../arch/mod.rs"]
+pub mod arch;
+
+#[path = "../drivers/mod.rs"]
+pub mod drivers;
+
+#[path = "../kernel/mod.rs"]
+pub mod kernel;
+
+#[path = "../memory/mod.rs"]
+pub mod memory;
+
+#[path = "../include/mod.rs"]
+pub mod include;
+
+// ==== imports ====
+
+use ::x86_64::instructions;
 use core::panic::PanicInfo;
 
-mod drivers;
-use drivers::framebuffer::Framebuffer;
-use drivers::keyboard;
-use drivers::serial;
+// ==== utilitários globais ====
 
-#[no_mangle]
-pub extern "C" fn kernel_main(mb_addr: usize) -> ! {
-    // inicializa framebuffer
-    let fb = Framebuffer::new(mb_addr);
-    fb.clear(0x00000000); // limpa tela preta
-
-    // desenha um retângulo branco
-    for y in 200..400 {
-        for x in 300..700 {
-            fb.put_pixel(x, y, 0x00FFFFFF);
-        }
-    }
-
-    // inicializa serial (debug)
-    serial::init();
-    serial::write_string("Kernel iniciou!\n");
-
+pub fn idle_loop() -> ! {
     loop {
-        // lê scancode do teclado
-        let _sc = keyboard::read_scancode();
-        // aqui você poderia processar e desenhar algo no framebuffer
-        unsafe { core::arch::asm!("hlt"); }
+        instructions::hlt();
     }
 }
 
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    serial::write_string("Kernel panic!\n");
-    loop { unsafe { core::arch::asm!("hlt"); } }
+/// Entry point chamado pelo assembly (multiboot / long mode)
+#[no_mangle]
+pub extern "C" fn kernel_main(multiboot_addr: usize) -> ! {
+    kernel::init();
+    memory::init(multiboot_addr);
+
+    idle_loop();
 }

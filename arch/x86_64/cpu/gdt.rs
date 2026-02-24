@@ -1,0 +1,78 @@
+use core::arch::asm;
+
+#[repr(C, packed)]
+struct GdtDescriptor {
+    limit_low: u16,
+    base_low: u16,
+    base_mid: u8,
+    access: u8,
+    granularity: u8,
+    base_high: u8,
+}
+
+impl GdtDescriptor {
+    const fn new(base: u32, limit: u32, access: u8, flags: u8) -> Self {
+        Self {
+            limit_low: (limit & 0xFFFF) as u16,
+            base_low: (base & 0xFFFF) as u16,
+            base_mid: ((base >> 16) & 0xFF) as u8,
+            access,
+            granularity: (((limit >> 16) & 0x0F) as u8) | (flags & 0xF0),
+            base_high: ((base >> 24) & 0xFF) as u8,
+
+        }
+    }
+}
+
+#[repr(C, packed)]
+struct GdtPointer {
+    limit: u16,
+    base: u64,
+}
+
+static GDT: [GdtDescriptor; 3] = [
+    // Null descriptor
+    GdtDescriptor::new(0, 0, 0, 0),
+
+    // Kernel code segment
+    GdtDescriptor::new(
+        0,
+        0xFFFFF,
+        0x9A, // present, ring 0, executable, readable
+        0xA0, // granularity=1, long mode=1
+    ),
+
+    // Kernel data segment
+    GdtDescriptor::new(
+        0,
+        0xFFFFF,
+        0x92, // present, ring 0, writable
+        0xA0, // granularity=1
+    ),    
+];
+
+pub fn init() {
+    let gdt_ptr = GdtPointer {
+        limit: (core::mem::size_of::<[GdtDescriptor; 3]>() - 1) as u16,
+        base: &GDT as *const _ as u64,
+    };
+
+    unsafe {
+        // Load GDT
+        asm!("lgdt [{}]", in(reg) &gdt_ptr);
+
+        // Reload segment registers
+        asm!(
+            "mov ax, 0x10",
+            "mov ds, ax",
+            "mov es, ax",
+            "mov ss, ax",
+            "pushq $0x08",
+            "lea rax, [rip + 1f]",
+            "push rax",
+            "1retq",
+            "1:",
+            out("rax") _,
+        );
+    }
+}
