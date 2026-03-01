@@ -71,7 +71,7 @@ pub fn init() {
             "lea rax, [rip + 1f]",
             "push rax",
             "1retq",
-            "1:",
+            "2:",
             out("rax") _,
         );
     }

@@ -1,21 +1,26 @@
 use core::fmt::{self, Write};
+use x86_64::instructions::port::Port;
 
-pub trait SerialDevice {
-    fn write_byte(&mut self, byte: u8);
+pub struct Serial {
+    data: Port<u8>,
 }
 
-static mut SERIAL: Option<&'static dyn SerialDevice> = None;
+static mut SERIAL: Option<Serial> = None;
 
-pub fn register(device: &'static dyn SerialDevice) {
+pub fn init() {
     unsafe {
-        SERIAL = Some(device);
+        let mut serial = Serial {
+            data: Port::new(0x3F8),
+        };
+
+        SERIAL = Some(serial);
     }
 }
 
 pub fn write_byte(byte: u8) {
     unsafe {
-        if let Some(dev) = SERIAL {
-            dev.write_byte(byte);
+        if let Some(ref mut s) = SERIAL {
+            s.data.write(byte);
         }
     }
 }
@@ -26,7 +31,27 @@ pub fn write_str(s: &str) {
     }
 }
 
-/// Writer para usar com `core::fmt`
+pub fn write_num(mut n: u64) {
+    if n == 0 {
+        write_byte(b'0');
+        return;
+    }
+
+    let mut buf = [0u8; 20];
+    let mut i = 0;
+
+    while n > 0 {
+        buf[i] = b'0' + (n % 10) as u8;
+        n /= 10;
+        i += 1;
+    }
+
+    while i > 0 {
+        i -= 1;
+        write_byte(buf[i]);
+    }
+}
+
 pub struct SerialWriter;
 
 impl Write for SerialWriter {
@@ -35,5 +60,3 @@ impl Write for SerialWriter {
         Ok(())
     }
 }
-
-pub mod uart16550;

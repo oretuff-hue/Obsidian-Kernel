@@ -1,24 +1,36 @@
-use crate::drivers::serial; // porque proxy é drivers.rs que faz mod drivers
-use crate::drivers::video::framebuffer::Framebuffer;
-use crate::kernel::logger;  // proxy kernel.rs contém mod kernel
-use crate::memory;          // proxy memory.rs contém mod memory
-use crate::arch::x86_64::memory::{frame_alloc, paging}; // proxy x86_64.rs
-use crate::drivers::video::VideoDevice;
-use crate::idle_loop;
-use crate::arch::x86_64::init;
+use crate::drivers::serial;
+use crate::kernel::logger;
+use crate::memory;
+use core::sync::atomic::Ordering;
+use crate::kernel::state::PROGRAM_RUNNING;
 
 pub fn init(mb_addr: usize) -> ! {
-    // serial::init();
+    serial::init();
     logger::init();
 
-    logger::info("Route Kernel starting...");
+    logger::info("Obsidian Kernel v0.0.3-pre-alpha");
+    logger::info("Entering 64-bit long mode");
 
-    crate::arch::x86_64::init();
     memory::init(mb_addr);
 
-    let fb = Framebuffer::new(mb_addr);
-    fb.clear(0x00000000);
+    logger::info("Memory initialized");
+    logger::info("Kernel ready");
 
-    logger::info("Kernel initialized");
-    idle_loop();
+    kernel_loop()
+}
+
+fn kernel_loop() -> ! {
+    loop {
+        if !PROGRAM_RUNNING.load(Ordering::SeqCst) {
+            idle();
+        }
+
+        unsafe { core::arch::asm!("hlt"); }
+    }
+}
+
+fn idle() -> ! {
+    loop {
+        unsafe { core::arch::asm!("hlt"); }
+    }
 }

@@ -1,19 +1,21 @@
-pub trait KeyboardDevice {
+use spin::Mutex;
+
+pub trait KeyboardDevice: Send {
     fn read_scancode(&mut self) -> Option<u8>;
 }
 
-static mut KEYBOARD: Option<&'static dyn KeyboardDevice> = None;
+static KEYBOARD: Mutex<Option<&'static mut dyn KeyboardDevice>> =
+    Mutex::new(None);
 
-pub fn register(device: &'static dyn KeyboardDevice) {
-    unsafe {
-        KEYBOARD = Some(device);
-    }
+pub fn register(device: &'static mut dyn KeyboardDevice) {
+    *KEYBOARD.lock() = Some(device);
 }
 
 pub fn read_scancode() -> Option<u8> {
-    unsafe {
-        KEYBOARD.and_then(|k| k.read_scancode())
-    }
+    KEYBOARD
+        .lock()
+        .as_mut()
+        .and_then(|k| k.read_scancode())
 }
 
 pub mod keyboard;

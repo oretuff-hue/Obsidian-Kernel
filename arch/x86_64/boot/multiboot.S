@@ -4,7 +4,7 @@
  AT&T syntax (GAS)
 --------------------------------------------------------*/
 
-.section .multiboot, "a"
+.section .multiboot2, "a"
 .align 8
 
 /*-----------------------------
@@ -20,10 +20,11 @@ header_start:
 /* Framebuffer REQUEST TAG (type = 5) */
 .short 5        /* tag type: framebuffer request */
 .short 0        /* flags */
-.long 20        /* tag size */
+.long 24       /* tag size */
 .long 1024      /* preferred width */
 .long 768       /* preferred height */
 .long 32        /* preferred bits per pixel */
+.long 0
 
 /* END TAG */
 .short 0

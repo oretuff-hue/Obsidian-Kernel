@@ -1,31 +1,24 @@
 pub mod map;
 pub mod heap;
 
-use crate::arch::x86_64::memory::{frame_alloc, paging};
+use crate::arch::x86_64::memory::frame_alloc;
 use crate::kernel::logger;
 
 pub fn init(mb_addr: usize) {
-    logger::info("Inicializando subsistema de memória");
+    logger::info("Loading memory map");
 
-    // 1. Ler mapa de memória do Multiboot2
-    let memory_map = map::from_multiboot(mb_addr);
-    logger::info("Mapa de memória carregado");
+    let memory_map = unsafe { map::from_multiboot(mb_addr) };
 
-    // 2. Inicializar frame allocator físico
     frame_alloc::init(&memory_map);
-    logger::info("Frame allocator inicializado");
 
-    // 3. Inicializar paging (MMU)
-    paging::init();
-    logger::info("Paging inicializado");
+    logger::info("Frame allocator ready");
 
-    // 4. Mapear heap do kernel
-    const HEAP_SIZE: usize = 1024 * 1024; // 1 MiB
-    let heap_start = paging::map_kernel_heap(HEAP_SIZE);
+    const HEAP_SIZE: usize = 1024 * 1024;
+    let heap_start = 0x4000000;
 
     unsafe {
         heap::init_heap(heap_start, HEAP_SIZE);
     }
 
-    logger::info("Heap do kernel inicializado");
+    logger::info("Heap ready");
 }

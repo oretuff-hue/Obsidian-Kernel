@@ -1,6 +1,8 @@
 pub mod paging;
 pub mod frame_alloc;
 
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use crate::memory::map;
 use crate::kernel::logger;
 use crate::memory::map::MemoryRegionType;
@@ -24,9 +26,12 @@ pub fn init(mb_addr: usize) {
             }
         });
     }
-
+     
+    let boxed_regions = Box::new(regions[..count].to_vec());
+    let static_regions: &'static [_] = Box::leak(boxed_regions);
+        
     let memory_map = map::MemoryMap {
-        regions: &regions[..count],
+        regions: static_regions,
     };
 
     logger::info("Mapa de memória parseado");
